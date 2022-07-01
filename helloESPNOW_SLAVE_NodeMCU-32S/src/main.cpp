@@ -12,33 +12,86 @@
 #include <esp_now.h>
 #include <Wifi.h>
 #include <Wire.h>
-#include <VL53L0X.h>
+#include <SPI.h>
+#include <Adafruit_MMA8451.h>
+#include <Adafruit_Sensor.h>
 
-VL53L0X LIDAR;
-
-//#define LONG_RANGE // makes LIDAR more sensitive... don't care for this test
-#define HIGH_SPEED // high speed low accuracy mode for the LIDAR sensor
-//#define HIGH_ACCURACY // you get high speed or high accuracy, choose one
+Adafruit_MMA8451 ACCEL = Adafruit_MMA8451();
 
 uint8_t masterBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC };
 uint8_t slaveBroadcastAddresss[] = { 0x24, 0x0A, 0xC4, 0xEC, 0xA6, 0xF0 };
 
-uint16_t incomingLidarReading;
+// these variables are for holding any received data (if code is uploaded to master unit)
+uint16_t incoming_accel_x_raw;
+uint16_t incoming_accel_y_raw;
+uint16_t incoming_accel_z_raw;
+float    incoming_accel_x_calculated;     // m/s^2
+float    incoming_accel_y_calculated;     // m/s^2
+float    incoming_accel_z_calculated;     // m/s^2
+uint8_t  incoming_accel_orientation_enum;
 
-typedef struct struct_message {
-    uint16_t lidar_reading;
-} struct_message;
+typedef struct struct_accel_message {
+  uint16_t accel_x_raw;
+  uint16_t accel_y_raw;
+  uint16_t accel_z_raw;
+  float    accel_x_calculated;     // m/s^2
+  float    accel_y_calculated;     // m/s^2
+  float    accel_z_calculated;     // m/s^2
+  uint8_t  accel_orientation_enum; // this is an enumerated value (every different value means something specific)
+} struct_accel_message;
 
-struct_message incomingSensorReading;
-struct_message outgoingSensorReading;
+struct_accel_message incomingSensorReading;
+struct_accel_message outgoingSensorReading;
 
 esp_now_peer_info_t peerInfo;
 
-void readCurrentLIDARValue() {
-  outgoingSensorReading.lidar_reading = LIDAR.readRangeSingleMillimeters();
+void interpretOrientationEnum(uint8_t ori) {
+  Serial.print(" --> ORIENTATION: ");
+  switch (ori) {
+    case MMA8451_PL_PUF: 
+      Serial.println("Portrait Up Front");
+      break;
+    case MMA8451_PL_PUB: 
+      Serial.println("Portrait Up Back");
+      break;    
+    case MMA8451_PL_PDF: 
+      Serial.println("Portrait Down Front");
+      break;
+    case MMA8451_PL_PDB: 
+      Serial.println("Portrait Down Back");
+      break;
+    case MMA8451_PL_LRF: 
+      Serial.println("Landscape Right Front");
+      break;
+    case MMA8451_PL_LRB: 
+      Serial.println("Landscape Right Back");
+      break;
+    case MMA8451_PL_LLF: 
+      Serial.println("Landscape Left Front");
+      break;
+    case MMA8451_PL_LLB: 
+      Serial.println("Landscape Left Back");
+      break;
+    }
 }
 
-void sendCurrentLIDARValue() {
+void readCurrentACCELEROMETERValue() {
+  ACCEL.read();
+  outgoingSensorReading.accel_x_raw = ACCEL.x;
+  outgoingSensorReading.accel_y_raw = ACCEL.y;
+  outgoingSensorReading.accel_z_raw = ACCEL.z;
+
+  sensors_event_t event;
+  ACCEL.getEvent(&event);
+
+  outgoingSensorReading.accel_x_calculated = event.acceleration.x;
+  outgoingSensorReading.accel_y_calculated = event.acceleration.y;
+  outgoingSensorReading.accel_z_calculated = event.acceleration.z;
+
+  outgoingSensorReading.accel_orientation_enum = ACCEL.getOrientation();
+}
+
+void sendCurrentACCELEROMETERValue() {
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(masterBroadcastAddress, (uint8_t *) &outgoingSensorReading, sizeof(outgoingSensorReading));
    
@@ -48,6 +101,10 @@ void sendCurrentLIDARValue() {
   else {
     Serial.println("Error sending the data");
   }
+}
+
+void printAccelerometerDataNice() {
+
 }
 
 // when this microcontroller sends a message, this function is triggered
@@ -61,7 +118,19 @@ void OnDataReceive(const uint8_t* mac_addr, const uint8_t *incomingData, int len
   memcpy(&incomingSensorReading, incomingData, sizeof(incomingSensorReading));
   Serial.print(" --> Number of Bytes Received: ");
   Serial.println(len);
-  incomingLidarReading = incomingSensorReading.lidar_reading;
+  incoming_accel_x_raw = incomingSensorReading.accel_x_raw;
+  incoming_accel_y_raw = incomingSensorReading.accel_y_raw;
+  incoming_accel_z_raw = incomingSensorReading.accel_z_raw;
+  
+  incoming_accel_x_calculated = incomingSensorReading.accel_x_calculated;
+  incoming_accel_y_calculated = incomingSensorReading.accel_y_calculated;
+  incoming_accel_z_calculated = incomingSensorReading.accel_z_calculated;
+  
+  incoming_accel_orientation_enum = incomingSensorReading.accel_orientation_enum;
+  
+  interpretOrientationEnum(incoming_accel_orientation_enum); // print the meaning of the incoming orientation enumeration
+  
+  printAccelerometerDataNice();
 }
 
 void setup() {
@@ -69,29 +138,6 @@ void setup() {
   Serial.begin(115200);
   // start I2C communication
   Wire.begin();
-  // initialize the LIDAR sensor (which communicates on the I2C protocol)
-  LIDAR.setTimeout(250);
-  if (!LIDAR.init()) {
-    Serial.println("COULD NOT INIT THE LIDAR. IS IT CORRECTLY ATTACHED?");
-    for(;;); // we can't go further if LIDAR doesn't work
-  }
-
-#if defined LONG_RANGE
-  // lower the return signal rate limit (default is 0.25 MCPS)
-  LIDAR.setSignalRateLimit(0.1);
-  // increase laser pulse periods (defaults are 14 and 10 PCLKs)
-  LIDAR.setVcselPulsePeriod(VL53L0X::VcselPeriodPreRange, 18);
-  LIDAR.setVcselPulsePeriod(VL53L0X::VcselPeriodFinalRange, 14);
-#endif
-
-#if defined HIGH_SPEED
-  // reduce timing budget to 20 ms (default is about 33 ms)
-  LIDAR.setMeasurementTimingBudget(20000);
-#elif defined HIGH_ACCURACY
-  // increase timing budget to 200 ms
-  LIDAR.setMeasurementTimingBudget(200000);
-#endif
-
 
   WiFi.mode(WIFI_STA); // station
   Serial.print("Hello, i'm slave, my MAC Address is: ");
@@ -106,7 +152,7 @@ void setup() {
   esp_now_register_send_cb(OnDataSent);
 
   // tell this ESP who it will be talking to (the master ESP32 which will print the LIDAR reading out in this case)
-  memcpy(peerInfo.peer_addr, masterBroadcastAddress, 6); // ADDRESS OF RECEIVER! (NOT OF THIS PARTICULAR uC!)
+  memcpy(peerInfo.peer_addr, masterBroadcastAddress, 6); // ADDRESS OF THE EXPECTED RECEIVER!!
   peerInfo.channel = 0;     // default channel
   peerInfo.encrypt = false; // default encryption (none)
 
@@ -116,13 +162,24 @@ void setup() {
   }
 
   esp_now_register_recv_cb(OnDataReceive);
+
+  if(!ACCEL.begin()) {
+    Serial.println("Could not initialize accelerometer (is it plugged in correctly?)");
+    for(;;); 
+  }
+
+  // idk why we do this but it's in the example, who am I to question it?
+  ACCEL.setRange(MMA8451_RANGE_2_G);
+  Serial.print("\nAccelerometer Range: ");
+  Serial.print(2 << ACCEL.getRange());
+  Serial.println(" G.");
 }
 
 // SLAVE
 void loop() {
-  readCurrentLIDARValue();
-  Serial.print(" ----> Current LIDAR value (to be transmitted to Master): ");
-  Serial.println(outgoingSensorReading.lidar_reading);
-  sendCurrentLIDARValue();
-  delay(500); // 0.5 sec delay between readings to not blow up our serial monitor
+  // read the accelerometer every X seconds and send packaged data to master
+  Serial.println("=================== [SENDING DATA (SLAVE SIDE)] ===================");
+  readCurrentACCELEROMETERValue();
+  sendCurrentACCELEROMETERValue();
+  delay(250); // 0.5 sec delay between readings to not blow up our serial monitor
 }
