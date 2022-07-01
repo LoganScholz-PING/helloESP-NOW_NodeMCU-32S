@@ -74,9 +74,9 @@ void interpretOrientationEnum(uint8_t orientation) {
 void printAccelerometerDataNice() {
   Serial.println("\n=================== [RECEIVING DATA (MASTER SIDE)] ===================");
   interpretOrientationEnum(incoming_accel_orientation_enum); // print the meaning of the incoming orientation enumeration
-  Serial.print(" ----> X_RAW: "); Serial.print(incoming_accel_x_raw); Serial.print(" (X calculated = "); Serial.print(incoming_accel_x_raw); Serial.println(")");
-  Serial.print(" ----> Y_RAW: "); Serial.print(incoming_accel_y_raw); Serial.print(" (Y calculated = "); Serial.print(incoming_accel_y_raw); Serial.println(")");
-  Serial.print(" ----> Z_RAW: "); Serial.print(incoming_accel_z_raw); Serial.print(" (Z calculated = "); Serial.print(incoming_accel_z_raw); Serial.println(")");
+  Serial.print(" ----> X_RAW: "); Serial.print(incoming_accel_x_raw); Serial.print(" (X calculated = "); Serial.print(incoming_accel_x_calculated); Serial.println(")");
+  Serial.print(" ----> Y_RAW: "); Serial.print(incoming_accel_y_raw); Serial.print(" (Y calculated = "); Serial.print(incoming_accel_y_calculated); Serial.println(")");
+  Serial.print(" ----> Z_RAW: "); Serial.print(incoming_accel_z_raw); Serial.print(" (Z calculated = "); Serial.print(incoming_accel_z_calculated); Serial.println(")");
 }
 
 // when this microcontroller sends a message, this function is triggered
