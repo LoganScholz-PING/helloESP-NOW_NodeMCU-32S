@@ -38,12 +38,18 @@ typedef struct struct_accel_message {
   float    accel_y_calculated;     // m/s^2
   float    accel_z_calculated;     // m/s^2
   uint8_t  accel_orientation_enum; // this is an enumerated value (every different value means something specific)
+  unsigned long total_measurement_time; // total time it took for 1 measurement
 } struct_accel_message;
 
 struct_accel_message incomingSensorReading;
 struct_accel_message outgoingSensorReading;
 
 esp_now_peer_info_t peerInfo;
+
+// These variables are for helping us track the time between each measurement
+unsigned long count = 0;
+unsigned long start_measurement_time = 0;
+unsigned long end_measurement_time   = 0;
 
 void interpretOrientationEnum(uint8_t ori) {
   Serial.print(" --> ORIENTATION: ");
@@ -93,6 +99,8 @@ void readCurrentACCELEROMETERValue() {
 
 void sendCurrentACCELEROMETERValue() {
   // Send message via ESP-NOW
+  end_measurement_time = micros();
+  outgoingSensorReading.total_measurement_time = end_measurement_time - start_measurement_time;
   esp_err_t result = esp_now_send(masterBroadcastAddress, (uint8_t *) &outgoingSensorReading, sizeof(outgoingSensorReading));
    
   if (result == ESP_OK) {
@@ -178,8 +186,9 @@ void setup() {
 // SLAVE
 void loop() {
   // read the accelerometer every X seconds and send packaged data to master
-  Serial.println("=================== [SENDING DATA (SLAVE SIDE)] ===================");
+  start_measurement_time = micros();
   readCurrentACCELEROMETERValue();
   sendCurrentACCELEROMETERValue();
-  delay(250); // 0.5 sec delay between readings to not blow up our serial monitor
+  delay(10); // this is in milliseconds. delaying the loop for 10ms every iteration will (hopefully) yield
+             // 100 measurements per second (aka measurement frequency of 100Hz)
 }

@@ -34,12 +34,17 @@ typedef struct struct_accel_message {
   float    accel_y_calculated;     // m/s^2
   float    accel_z_calculated;     // m/s^2
   uint8_t  accel_orientation_enum; // this is an enumerated value (every different value means something specific)
+  unsigned long total_measurement_time; // total time it took for 1 measurement
 } struct_accel_message;
 
 struct_accel_message incomingSensorReading;
 struct_accel_message outgoingSensorReading;
 
 esp_now_peer_info_t peerInfo;
+
+// These variables are for helping us track the time between each measurement
+unsigned long count = 0;
+unsigned long total_time_delta = 0;
 
 void interpretOrientationEnum(uint8_t orientation) {
   Serial.print(" ----> ORIENTATION: ");
@@ -71,12 +76,23 @@ void interpretOrientationEnum(uint8_t orientation) {
     }
 }
 
+
 void printAccelerometerDataNice() {
-  Serial.println("\n=================== [RECEIVING DATA (MASTER SIDE)] ===================");
-  interpretOrientationEnum(incoming_accel_orientation_enum); // print the meaning of the incoming orientation enumeration
-  Serial.print(" ----> X_RAW: "); Serial.print(incoming_accel_x_raw); Serial.print(" (X calculated = "); Serial.print(incoming_accel_x_calculated); Serial.println(")");
-  Serial.print(" ----> Y_RAW: "); Serial.print(incoming_accel_y_raw); Serial.print(" (Y calculated = "); Serial.print(incoming_accel_y_calculated); Serial.println(")");
-  Serial.print(" ----> Z_RAW: "); Serial.print(incoming_accel_z_raw); Serial.print(" (Z calculated = "); Serial.print(incoming_accel_z_calculated); Serial.println(")");
+  //Serial.println("\n=================== [RECEIVING DATA (MASTER SIDE)] ===================");
+  //interpretOrientationEnum(incoming_accel_orientation_enum); // print the meaning of the incoming orientation enumeration
+  //Serial.print(" ----> X_RAW: "); Serial.print(incoming_accel_x_raw); Serial.print(" (X calculated = "); Serial.print(incoming_accel_x_calculated); Serial.println(")");
+  //Serial.print(" ----> Y_RAW: "); Serial.print(incoming_accel_y_raw); Serial.print(" (Y calculated = "); Serial.print(incoming_accel_y_calculated); Serial.println(")");
+  //Serial.print(" ----> Z_RAW: "); Serial.print(incoming_accel_z_raw); Serial.print(" (Z calculated = "); Serial.print(incoming_accel_z_calculated); Serial.println(")");
+
+  Serial.print(count++);
+  Serial.print("-");
+  Serial.print(incoming_accel_x_calculated);
+  Serial.print(",");
+  Serial.print(incoming_accel_y_calculated);
+  Serial.print(",");
+  Serial.print(incoming_accel_z_calculated);
+  Serial.print(",");
+  Serial.println(total_time_delta);
 }
 
 // when this microcontroller sends a message, this function is triggered
@@ -101,6 +117,8 @@ void OnDataReceive(const uint8_t* mac_addr, const uint8_t *incomingData, int len
   incoming_accel_y_calculated = incomingSensorReading.accel_y_calculated;
   incoming_accel_z_calculated = incomingSensorReading.accel_z_calculated;
   
+  total_time_delta            = incomingSensorReading.total_measurement_time;
+
   incoming_accel_orientation_enum = incomingSensorReading.accel_orientation_enum;
 
   // we've harvested all the data from the incoming data packet and stored 
@@ -133,6 +151,8 @@ void setup() {
   }
 
   esp_now_register_recv_cb(OnDataReceive);
+
+  Serial.println(F("\nFORMAT OF OUTPUT: [COUNT]-[X ACCEL],[Y ACCEL],[Z ACCEL],[MEASUREMENT TIME]"));
 }
 
 // MASTER
