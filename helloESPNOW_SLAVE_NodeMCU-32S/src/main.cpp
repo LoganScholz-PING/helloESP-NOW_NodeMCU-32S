@@ -1,11 +1,11 @@
-/* ==========================================================
-   ------------------------ SLAVE ---------------------------
-   ==========================================================
+/* ===============================================================
+   ------------------------ PERIPHERAL ---------------------------
+   ===============================================================
 
-   Master MAC: 24:0A:C4:EC:07:CC
-   Slave  MAC: 24:0A:C4:EC:A6:F0
+   Controller MAC: 24:0A:C4:EC:07:CC
+   Peripheral MAC: 24:0A:C4:EC:A6:F0
 
-   ** SLAVE READS LIDAR DATA AND TRANSMITS TO MASTER **
+   ** PERIPHERAL READS ACCELEROMETER DATA AND TRANSMITS TO CONTROLLER **
 */
 
 #include <Arduino.h>
@@ -18,10 +18,10 @@
 
 Adafruit_MMA8451 ACCEL = Adafruit_MMA8451();
 
-uint8_t masterBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC };
-uint8_t slaveBroadcastAddresss[] = { 0x24, 0x0A, 0xC4, 0xEC, 0xA6, 0xF0 };
+uint8_t controllerBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC };
+uint8_t peripheralBroadcastAddresss[] = { 0x24, 0x0A, 0xC4, 0xEC, 0xA6, 0xF0 };
 
-// these variables are for holding any received data (if code is uploaded to master unit)
+// these variables are for holding any received data (if code is uploaded to controller unit)
 uint16_t incoming_accel_x_raw;
 uint16_t incoming_accel_y_raw;
 uint16_t incoming_accel_z_raw;
@@ -38,7 +38,7 @@ typedef struct struct_accel_message {
   float    accel_y_calculated;     // m/s^2
   float    accel_z_calculated;     // m/s^2
   uint8_t  accel_orientation_enum; // this is an enumerated value (every different value means something specific)
-  unsigned long total_measurement_time; // total time it took for 1 measurement
+  unsigned long total_measurement_time; // total time it took for 1 measurement (milliseconds)
 } struct_accel_message;
 
 struct_accel_message incomingSensorReading;
@@ -99,9 +99,12 @@ void readCurrentACCELEROMETERValue() {
 
 void sendCurrentACCELEROMETERValue() {
   // Send message via ESP-NOW
-  end_measurement_time = micros();
+   
+  // TODO: Put call to esp_wifi_start() or WiFi.setSleep(false); here (idk if second one works)
+   
+  end_measurement_time = millis();
   outgoingSensorReading.total_measurement_time = end_measurement_time - start_measurement_time;
-  esp_err_t result = esp_now_send(masterBroadcastAddress, (uint8_t *) &outgoingSensorReading, sizeof(outgoingSensorReading));
+  esp_err_t result = esp_now_send(controllerBroadcastAddress, (uint8_t *) &outgoingSensorReading, sizeof(outgoingSensorReading));
    
   if (result == ESP_OK) {
     Serial.println("Sent with success");
@@ -148,7 +151,7 @@ void setup() {
   Wire.begin();
 
   WiFi.mode(WIFI_STA); // station
-  Serial.print("Hello, i'm slave, my MAC Address is: ");
+  Serial.print("Hello, i'm peripheral, my MAC Address is: ");
   Serial.println(WiFi.macAddress());
 
   if(esp_now_init() != ESP_OK) {
@@ -159,8 +162,8 @@ void setup() {
   // tell the system to call the OnDataSent() function whenever data is transmitted
   esp_now_register_send_cb(OnDataSent);
 
-  // tell this ESP who it will be talking to (the master ESP32 which will print the LIDAR reading out in this case)
-  memcpy(peerInfo.peer_addr, masterBroadcastAddress, 6); // ADDRESS OF THE EXPECTED RECEIVER!!
+  // tell this ESP who it will be talking to (the controller ESP32 which will print the Accelerometer reading out in this case)
+  memcpy(peerInfo.peer_addr, controllerBroadcastAddress, 6); // ADDRESS OF THE EXPECTED RECEIVER!!
   peerInfo.channel = 0;     // default channel
   peerInfo.encrypt = false; // default encryption (none)
 
@@ -176,19 +179,24 @@ void setup() {
     for(;;); 
   }
 
-  // idk why we do this but it's in the example, who am I to question it?
+  // smaller range = more precision
   ACCEL.setRange(MMA8451_RANGE_2_G);
   Serial.print("\nAccelerometer Range: ");
   Serial.print(2 << ACCEL.getRange());
   Serial.println(" G.");
 }
 
-// SLAVE
+// PERIPHERAL
 void loop() {
-  // read the accelerometer every X seconds and send packaged data to master
-  start_measurement_time = micros();
+  // read the accelerometer every X seconds and send packaged data to controller
+  start_measurement_time = millis();
   readCurrentACCELEROMETERValue();
   sendCurrentACCELEROMETERValue();
-  delay(10); // this is in milliseconds. delaying the loop for 10ms every iteration will (hopefully) yield
-             // 100 measurements per second (aka measurement frequency of 100Hz)
+   
+  // TODO: Put call to esp_wifi_stop() or WiFi.setSleep(true); here (idk if second one works)
+   
+  delay(6); // this is in milliseconds. delaying the loop for 10ms *TOTAL* every iteration will 
+            // yield ~100Hz measurement frequency. Sample rate is maxed at 4ms at the moment
+            // NOTE: it has been tested that it takes about 4ms to take a reading from the
+            // accelerometer, that's why it's delay(6) and not delay(10)
 }
