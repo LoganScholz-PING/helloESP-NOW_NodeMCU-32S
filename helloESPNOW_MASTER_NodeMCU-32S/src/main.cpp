@@ -42,6 +42,8 @@ struct_accel_message outgoingSensorReading;
 
 esp_now_peer_info_t peerInfo;
 
+unsigned long last_message_received_time = 0;
+
 // These variables are for helping us track the time between each measurement
 unsigned long count = 0;
 unsigned long total_time_delta = 0;
@@ -83,7 +85,7 @@ void printAccelerometerDataNice() {
   //Serial.print(" ----> X_RAW: "); Serial.print(incoming_accel_x_raw); Serial.print(" (X calculated = "); Serial.print(incoming_accel_x_calculated); Serial.println(")");
   //Serial.print(" ----> Y_RAW: "); Serial.print(incoming_accel_y_raw); Serial.print(" (Y calculated = "); Serial.print(incoming_accel_y_calculated); Serial.println(")");
   //Serial.print(" ----> Z_RAW: "); Serial.print(incoming_accel_z_raw); Serial.print(" (Z calculated = "); Serial.print(incoming_accel_z_calculated); Serial.println(")");
-
+  if(millis() - last_message_received_time >= 1000) count = 0;
   Serial.print(count++);
   Serial.print("-");
   Serial.print(incoming_accel_x_calculated);
@@ -93,6 +95,8 @@ void printAccelerometerDataNice() {
   Serial.print(incoming_accel_z_calculated);
   Serial.print(",");
   Serial.println(total_time_delta);
+
+  last_message_received_time = millis();
 }
 
 // when this microcontroller sends a message, this function is triggered
@@ -104,8 +108,8 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 // when this microcontroller receives a message, this function is triggered
 void OnDataReceive(const uint8_t* mac_addr, const uint8_t *incomingData, int len) {
   memcpy(&incomingSensorReading, incomingData, sizeof(incomingSensorReading));
-  Serial.print(" --> Number of Bytes Received: ");
-  Serial.println(len);
+  //Serial.print(" --> Number of Bytes Received: ");
+  //Serial.println(len);
 
   // now that the incomingSensorReading memory structure's values are filled  
   // in, move the data into local variables so we can do stuff with it

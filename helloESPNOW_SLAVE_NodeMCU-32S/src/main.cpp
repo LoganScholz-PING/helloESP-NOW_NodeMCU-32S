@@ -16,6 +16,8 @@
 #include <Adafruit_MMA8451.h>
 #include <Adafruit_Sensor.h>
 
+#define START_TRANSMITTING_BUTTON 15
+
 Adafruit_MMA8451 ACCEL = Adafruit_MMA8451();
 
 uint8_t controllerBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC };
@@ -146,6 +148,8 @@ void OnDataReceive(const uint8_t* mac_addr, const uint8_t *incomingData, int len
 
 void setup() {
   // 
+  pinMode(START_TRANSMITTING_BUTTON, INPUT_PULLUP);
+
   Serial.begin(115200);
   // start I2C communication
   Wire.begin();
@@ -184,19 +188,31 @@ void setup() {
   Serial.print("\nAccelerometer Range: ");
   Serial.print(2 << ACCEL.getRange());
   Serial.println(" G.");
+
+  WiFi.setSleep(true);
 }
 
 // PERIPHERAL
+unsigned long last_button_press_time = 0;
+unsigned long button_debounce_time = 500; // 500 milliseconds
 void loop() {
-  // read the accelerometer every X seconds and send packaged data to controller
-  start_measurement_time = millis();
-  readCurrentACCELEROMETERValue();
-  sendCurrentACCELEROMETERValue();
-   
-  // TODO: Put call to esp_wifi_stop() or WiFi.setSleep(true); here (idk if second one works)
-   
-  delay(6); // this is in milliseconds. delaying the loop for 10ms *TOTAL* every iteration will 
-            // yield ~100Hz measurement frequency. Sample rate is maxed at 4ms at the moment
-            // NOTE: it has been tested that it takes about 4ms to take a reading from the
-            // accelerometer, that's why it's delay(6) and not delay(10)
+  bool button_pressed = false;
+  while(!digitalRead(START_TRANSMITTING_BUTTON) && millis() - last_button_press_time >= button_debounce_time) {
+    // read the accelerometer every X seconds and send packaged data to controller
+    start_measurement_time = millis();
+    readCurrentACCELEROMETERValue();
+    //WiFi.setSleep(false); // try to not make the ESP32 overheat by only turning on WiFi when we need it
+    sendCurrentACCELEROMETERValue();
+    //WiFi.setSleep(true);
+    
+    button_pressed = true;
+
+    delay(6); // this is in milliseconds. delaying the loop for 10ms *TOTAL* every iteration will 
+              // yield ~100Hz measurement frequency. Sample rate is maxed at 4ms at the moment
+              // NOTE: it has been tested that it takes about 4ms to take a reading from the
+              // accelerometer, that's why it's delay(6) and not delay(10)
+  }
+  if(button_pressed) {
+    last_button_press_time = millis();
+  }
 }
