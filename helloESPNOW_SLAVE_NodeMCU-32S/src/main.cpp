@@ -13,38 +13,53 @@
 #include <Wifi.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <Adafruit_MMA8451.h>
-#include <Adafruit_Sensor.h>
+#include "I2Cdev.h"
+#include "MPU6050.h"
 
 #define START_TRANSMITTING_BUTTON 15
 
-Adafruit_MMA8451 ACCEL = Adafruit_MMA8451();
+MPU6050 ACCEL;
 
-uint8_t controllerBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC };
+//uint8_t controllerBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC }; // good one
+uint8_t controllerBroadcastAddress[] = { 0x30, 0xC6, 0xF7, 0x29, 0xBE, 0x68 };
 uint8_t peripheralBroadcastAddresss[] = { 0x24, 0x0A, 0xC4, 0xEC, 0xA6, 0xF0 };
 
-// these variables are for holding any received data (if code is uploaded to controller unit)
-uint16_t incoming_accel_x_raw;
-uint16_t incoming_accel_y_raw;
-uint16_t incoming_accel_z_raw;
-float    incoming_accel_x_calculated;     // m/s^2
-float    incoming_accel_y_calculated;     // m/s^2
-float    incoming_accel_z_calculated;     // m/s^2
-uint8_t  incoming_accel_orientation_enum;
+// these variables are for holding any received data
+// for use with ACCEL.getMotion6(..) function
+int16_t incoming_accel_x_raw;
+int16_t incoming_accel_y_raw;
+int16_t incoming_accel_z_raw;
+int16_t incoming_gyro_x_raw;
+int16_t incoming_gyro_y_raw;
+int16_t incoming_gyro_z_raw;
+// for use with ACCEL.getAcceleration(..) function
+int16_t incoming_accel_x_processed;
+int16_t incoming_accel_y_processed;
+int16_t incoming_accel_z_processed;
+// for use with ACCEL.getRotation(..) function
+int16_t incoming_gyro_x_processed;
+int16_t incoming_gyro_y_processed;
+int16_t incoming_gyro_z_processed;
 
 typedef struct struct_accel_message {
-  uint16_t accel_x_raw;
-  uint16_t accel_y_raw;
-  uint16_t accel_z_raw;
-  float    accel_x_calculated;     // m/s^2
-  float    accel_y_calculated;     // m/s^2
-  float    accel_z_calculated;     // m/s^2
-  uint8_t  accel_orientation_enum; // this is an enumerated value (every different value means something specific)
+  int16_t accel_x_raw;
+  int16_t accel_y_raw;
+  int16_t accel_z_raw;
+  int16_t gyro_x_raw;
+  int16_t gyro_y_raw;
+  int16_t gyro_z_raw;
+
+  int16_t accel_x_proc;
+  int16_t accel_y_proc;
+  int16_t accel_z_proc;
+  int16_t gyro_x_proc;
+  int16_t gyro_y_proc;
+  int16_t gyro_z_proc;
   unsigned long total_measurement_time; // total time it took for 1 measurement (milliseconds)
 } struct_accel_message;
 
-struct_accel_message incomingSensorReading;
-struct_accel_message outgoingSensorReading;
+struct_accel_message incomingSensorReading; // for controller code
+struct_accel_message outgoingSensorReading; // for peripheral code
 
 esp_now_peer_info_t peerInfo;
 
@@ -53,71 +68,56 @@ unsigned long count = 0;
 unsigned long start_measurement_time = 0;
 unsigned long end_measurement_time   = 0;
 
-void interpretOrientationEnum(uint8_t ori) {
-  Serial.print(" --> ORIENTATION: ");
-  switch (ori) {
-    case MMA8451_PL_PUF: 
-      Serial.println("Portrait Up Front");
-      break;
-    case MMA8451_PL_PUB: 
-      Serial.println("Portrait Up Back");
-      break;    
-    case MMA8451_PL_PDF: 
-      Serial.println("Portrait Down Front");
-      break;
-    case MMA8451_PL_PDB: 
-      Serial.println("Portrait Down Back");
-      break;
-    case MMA8451_PL_LRF: 
-      Serial.println("Landscape Right Front");
-      break;
-    case MMA8451_PL_LRB: 
-      Serial.println("Landscape Right Back");
-      break;
-    case MMA8451_PL_LLF: 
-      Serial.println("Landscape Left Front");
-      break;
-    case MMA8451_PL_LLB: 
-      Serial.println("Landscape Left Back");
-      break;
-    }
-}
-
 void readCurrentACCELEROMETERValue() {
-  ACCEL.read();
-  outgoingSensorReading.accel_x_raw = ACCEL.x;
-  outgoingSensorReading.accel_y_raw = ACCEL.y;
-  outgoingSensorReading.accel_z_raw = ACCEL.z;
+  // ask the accelerometer for current readings
+  //
+  // (putting the "&" on the variable in the function call
+  // is like giving the function a variable we created and
+  // can read and saying "please put the result data here". This 
+  // way we can keep the data in memory once the function 
+  // exits)
+  ACCEL.getMotion6(&incoming_accel_x_raw, 
+                   &incoming_accel_y_raw, 
+                   &incoming_accel_z_raw, 
+                   &incoming_gyro_x_raw, 
+                   &incoming_gyro_y_raw, 
+                   &incoming_gyro_z_raw);
 
-  sensors_event_t event;
-  ACCEL.getEvent(&event);
+ ACCEL.getAcceleration(&incoming_accel_x_processed,
+                       &incoming_accel_y_processed,
+                       &incoming_accel_z_processed);
 
-  outgoingSensorReading.accel_x_calculated = event.acceleration.x;
-  outgoingSensorReading.accel_y_calculated = event.acceleration.y;
-  outgoingSensorReading.accel_z_calculated = event.acceleration.z;
+ ACCEL.getRotation(&incoming_gyro_x_processed,
+                   &incoming_gyro_x_processed,
+                   &incoming_gyro_x_processed);
 
-  outgoingSensorReading.accel_orientation_enum = ACCEL.getOrientation();
+  outgoingSensorReading.accel_x_raw  = incoming_accel_x_raw;
+  outgoingSensorReading.accel_y_raw  = incoming_accel_y_raw;
+  outgoingSensorReading.accel_z_raw  = incoming_accel_z_raw;
+  outgoingSensorReading.gyro_x_raw   = incoming_gyro_x_raw;
+  outgoingSensorReading.gyro_y_raw   = incoming_gyro_y_raw;
+  outgoingSensorReading.gyro_z_raw   = incoming_gyro_z_raw;
+
+  outgoingSensorReading.accel_x_proc = incoming_accel_x_processed;
+  outgoingSensorReading.accel_y_proc = incoming_accel_y_processed;
+  outgoingSensorReading.accel_z_proc = incoming_accel_z_processed;
+  outgoingSensorReading.gyro_x_proc  = incoming_gyro_x_processed;
+  outgoingSensorReading.gyro_y_proc  = incoming_gyro_y_processed;
+  outgoingSensorReading.gyro_z_proc  = incoming_gyro_z_processed;
 }
 
 void sendCurrentACCELEROMETERValue() {
   // Send message via ESP-NOW
-   
-  // TODO: Put call to esp_wifi_start() or WiFi.setSleep(false); here (idk if second one works)
-   
   end_measurement_time = millis();
   outgoingSensorReading.total_measurement_time = end_measurement_time - start_measurement_time;
   esp_err_t result = esp_now_send(controllerBroadcastAddress, (uint8_t *) &outgoingSensorReading, sizeof(outgoingSensorReading));
    
-  if (result == ESP_OK) {
-    Serial.println("Sent with success");
-  }
-  else {
-    Serial.println("Error sending the data");
-  }
+  if (result == ESP_OK) Serial.println("Sent with success");
+  else Serial.println("Error sending the data");
 }
 
 void printAccelerometerDataNice() {
-
+  // no need for peripheral to print
 }
 
 // when this microcontroller sends a message, this function is triggered
@@ -129,20 +129,22 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 // when this microcontroller receives a message, this function is triggered
 void OnDataReceive(const uint8_t* mac_addr, const uint8_t *incomingData, int len) {
   memcpy(&incomingSensorReading, incomingData, sizeof(incomingSensorReading));
-  Serial.print(" --> Number of Bytes Received: ");
-  Serial.println(len);
+  //Serial.print(" --> Number of Bytes Received: ");
+  //Serial.println(len);
   incoming_accel_x_raw = incomingSensorReading.accel_x_raw;
   incoming_accel_y_raw = incomingSensorReading.accel_y_raw;
   incoming_accel_z_raw = incomingSensorReading.accel_z_raw;
-  
-  incoming_accel_x_calculated = incomingSensorReading.accel_x_calculated;
-  incoming_accel_y_calculated = incomingSensorReading.accel_y_calculated;
-  incoming_accel_z_calculated = incomingSensorReading.accel_z_calculated;
-  
-  incoming_accel_orientation_enum = incomingSensorReading.accel_orientation_enum;
-  
-  interpretOrientationEnum(incoming_accel_orientation_enum); // print the meaning of the incoming orientation enumeration
-  
+  incoming_gyro_x_raw  = incomingSensorReading.gyro_x_raw;
+  incoming_gyro_y_raw  = incomingSensorReading.gyro_y_raw;
+  incoming_gyro_z_raw  = incomingSensorReading.gyro_z_raw;
+
+  incoming_accel_x_processed = incomingSensorReading.accel_x_proc;
+  incoming_accel_y_processed = incomingSensorReading.accel_y_proc;
+  incoming_accel_z_processed = incomingSensorReading.accel_z_proc;
+  incoming_gyro_x_processed = incomingSensorReading.gyro_x_proc;
+  incoming_gyro_y_processed = incomingSensorReading.gyro_y_proc;
+  incoming_gyro_z_processed = incomingSensorReading.gyro_z_proc;
+
   printAccelerometerDataNice();
 }
 
@@ -150,7 +152,7 @@ void setup() {
   // 
   pinMode(START_TRANSMITTING_BUTTON, INPUT_PULLUP);
 
-  Serial.begin(115200);
+  Serial.begin(38400);
   // start I2C communication
   Wire.begin();
 
@@ -178,17 +180,21 @@ void setup() {
 
   esp_now_register_recv_cb(OnDataReceive);
 
-  if(!ACCEL.begin()) {
-    Serial.println("Could not initialize accelerometer (is it plugged in correctly?)");
-    for(;;); 
+  Serial.println("Initializing Accelerometer...");
+  ACCEL.initialize();
+
+  Serial.println("Testing Accelerometer Connection...");
+  if(!ACCEL.testConnection()) {
+    Serial.println("MPU6050 connection failed");
+    for(;;);
+  }
+  else {
+    Serial.println("MPU6050 connection successful");
   }
 
-  // smaller range = more precision
-  ACCEL.setRange(MMA8451_RANGE_2_G);
-  Serial.print("\nAccelerometer Range: ");
-  Serial.print(2 << ACCEL.getRange());
-  Serial.println(" G.");
+  // TODO: figure out how to set settings on accelerometer
 
+  Serial.println("Entering main loop and sleeping...");
   WiFi.setSleep(true);
 }
 
