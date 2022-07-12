@@ -64,7 +64,7 @@ unsigned long total_time_delta = 0;
 void printAccelerometerDataNice() {
   if(millis() - last_message_received_time >= 1000) count = 0;
   Serial.print(count++);
-  Serial.print("-");
+  Serial.print(",");
   Serial.print(incoming_accel_x_raw);
   Serial.print(",");
   Serial.print(incoming_accel_y_raw);
@@ -155,7 +155,7 @@ void setup() {
 
   esp_now_register_recv_cb(OnDataReceive);
 
-  Serial.println(F("\nFORMAT OF OUTPUT: [COUNT]-[AXR],[AYR],[AZR],[GXR],[GYR],[GZR],[AXP],[AYP],[AZP],[GXP],[GYP],[GZP],[MEASUREMENT TIME]\n"));
+  Serial.println(F("\nFORMAT OF OUTPUT: [COUNT],[AXR],[AYR],[AZR],[GXR],[GYR],[GZR],[AXP],[AYP],[AZP],[GXP],[GYP],[GZP],[MEASUREMENT TIME]\n"));
   Serial.println("...WAITING FOR DATA\n");
 }
 
