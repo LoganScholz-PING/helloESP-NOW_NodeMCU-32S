@@ -1,49 +1,25 @@
-[![Build Status](https://travis-ci.org/ElectronicCats/mpu6050.svg?branch=master)](https://travis-ci.org/ElectronicCats/mpu6050)
+Arduino-MPU6050
+===============
 
-# MPU6050 by Electronic Cats
+MPU6050 Triple Axis Gyroscope & Accelerometer Arduino Library.
 
-MPU-6050 6-axis accelerometer/gyroscope Arduino Library
-adapted for Arduino Library Manager by Electronic Cats, Feb 2019
+![MPU6050 Processing](http://www.jarzebski.pl/media/zoom/publish/2014/10/mpu6050-processing-2.png "MPU6050 Processing")
 
-The MPU6050 combines a 3-axis gyroscope and a 3-axis accelerometer on the same silicon die together with
-an onboard Digital Motion Processor(DMP) which processes complex 6-axis MotionFusion algorithms.
+Tutorials: http://www.jarzebski.pl/arduino/czujniki-i-sensory/3-osiowy-zyroskop-i-akcelerometr-mpu6050.html
 
-### Quick Installing
+This library use I2C to communicate, 2 pins are required to interface
 
-To install, use the Arduino Library Manager and search for "mpu6050" and install the library.
+I need your help
+----------------
 
-### Manual Installing
-To install this library:
+July 31, 2017
 
- - install it using the Arduino Library manager ("Sketch" -> "Include
-   Library" -> "Manage Libraries..."), or
- - download a zipfile from github using the "Download ZIP" button and
-   install it using the IDE ("Sketch" -> "Include Library" -> "Add .ZIP
-   Library..."
- - clone this git repository into your sketchbook/libraries folder.
+In the near future I plan to refactoring the libraries. The main goal is to improve code quality, new features and add support for different versions of Arduino boards like Uno, Mega and Zero.
 
-For more info, see https://www.arduino.cc/en/Guide/Libraries
+For this purpose I need to buy modules, Arduino Boards and lot of beer. 
 
-## Features of this version
+If you want to support the further and long-term development of libraries, please help.
 
-- Support for SAMD21 or ARM
-- Support ESP32 and ESP8266
-- Support for SAM
+You can do this by transferring any amount to my PayPal account: paypal@jarzebski.pl
 
-### Original Library
-
-Based in the work of [jrowberg/i2cdevlib](https://github.com/jrowberg/i2cdevlib/tree/master/Arduino/MPU6050)
-
-### Maintainer
-
-<a href="https://github.com/sponsors/ElectronicCats">
-  <img src="https://electroniccats.com/wp-content/uploads/2020/07/Badge_GHS.png" height="104" />
-</a>
-
-Electronic Cats invests time and resources providing this open source design, please support Electronic Cats and open-source hardware by purchasing products from Electronic Cats!
-
-### License
-
-MIT
-
-
+Thanks!

@@ -11,14 +11,18 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <Wifi.h>
-#include <Wire.h>
+
 #include <SPI.h>
-#include "I2Cdev.h"
+//#include "I2Cdev.h"
+#include <Wire.h>
 #include "MPU6050.h"
+
+
+#define I2CDEV_SERIAL_DEBUG 1
 
 #define START_TRANSMITTING_BUTTON 15
 
-MPU6050 ACCEL;
+MPU6050 ACCEL; // hardcode I2C address = 0x68 or 0x69
 
 uint8_t controllerBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC }; // good one
 //uint8_t controllerBroadcastAddress[] = { 0x30, 0xC6, 0xF7, 0x29, 0xBE, 0x68 }; // test unit
@@ -26,35 +30,35 @@ uint8_t peripheralBroadcastAddresss[] = { 0x24, 0x0A, 0xC4, 0xEC, 0xA6, 0xF0 };
 
 // these variables are for holding any received data
 // for use with ACCEL.getMotion6(..) function
-int16_t incoming_accel_x_raw;
-int16_t incoming_accel_y_raw;
-int16_t incoming_accel_z_raw;
-int16_t incoming_gyro_x_raw;
-int16_t incoming_gyro_y_raw;
-int16_t incoming_gyro_z_raw;
+float incoming_accel_x_raw;
+float incoming_accel_y_raw;
+float incoming_accel_z_raw;
+float incoming_gyro_x_raw;
+float incoming_gyro_y_raw;
+float incoming_gyro_z_raw;
 // for use with ACCEL.getAcceleration(..) function
-int16_t incoming_accel_x_processed;
-int16_t incoming_accel_y_processed;
-int16_t incoming_accel_z_processed;
+float incoming_accel_x_processed;
+float incoming_accel_y_processed;
+float incoming_accel_z_processed;
 // for use with ACCEL.getRotation(..) function
-int16_t incoming_gyro_x_processed;
-int16_t incoming_gyro_y_processed;
-int16_t incoming_gyro_z_processed;
+float incoming_gyro_x_processed;
+float incoming_gyro_y_processed;
+float incoming_gyro_z_processed;
 
 typedef struct struct_accel_message {
-  int16_t accel_x_raw;
-  int16_t accel_y_raw;
-  int16_t accel_z_raw;
-  int16_t gyro_x_raw;
-  int16_t gyro_y_raw;
-  int16_t gyro_z_raw;
+  float accel_x_raw;
+  float accel_y_raw;
+  float accel_z_raw;
+  float gyro_x_raw;
+  float gyro_y_raw;
+  float gyro_z_raw;
 
-  int16_t accel_x_proc;
-  int16_t accel_y_proc;
-  int16_t accel_z_proc;
-  int16_t gyro_x_proc;
-  int16_t gyro_y_proc;
-  int16_t gyro_z_proc;
+  float accel_x_proc;
+  float accel_y_proc;
+  float accel_z_proc;
+  float gyro_x_proc;
+  float gyro_y_proc;
+  float gyro_z_proc;
   unsigned long total_measurement_time; // total time it took for 1 measurement (milliseconds)
 } struct_accel_message;
 
@@ -70,40 +74,29 @@ unsigned long end_measurement_time   = 0;
 
 void readCurrentACCELEROMETERValue() {
   // ask the accelerometer for current readings
-  //
-  // (putting the "&" on the variable in the function call
-  // is like giving the function a variable we created and
-  // can read and saying "please put the result data here". This 
-  // way we can keep the data in memory once the function 
-  // exits)
-  ACCEL.getMotion6(&incoming_accel_x_raw, 
-                   &incoming_accel_y_raw, 
-                   &incoming_accel_z_raw, 
-                   &incoming_gyro_x_raw, 
-                   &incoming_gyro_y_raw, 
-                   &incoming_gyro_z_raw);
+  Vector rawAccel  = ACCEL.readRawAccel();
+  Vector normAccel = ACCEL.readNormalizeAccel();
+  Vector rawGyro   = ACCEL.readRawGyro();
+  Vector normGyro  = ACCEL.readNormalizeGyro();
 
- ACCEL.getAcceleration(&incoming_accel_x_processed,
-                       &incoming_accel_y_processed,
-                       &incoming_accel_z_processed);
+  // TODO: This is kinda gross, put the vectors in the struct and shuttle them
+  // around that way..... eventually
 
- ACCEL.getRotation(&incoming_gyro_x_processed,
-                   &incoming_gyro_x_processed,
-                   &incoming_gyro_x_processed);
+  outgoingSensorReading.accel_x_raw  = rawAccel.XAxis;
+  outgoingSensorReading.accel_y_raw  = rawAccel.YAxis;
+  outgoingSensorReading.accel_z_raw  = rawAccel.ZAxis;
 
-  outgoingSensorReading.accel_x_raw  = incoming_accel_x_raw;
-  outgoingSensorReading.accel_y_raw  = incoming_accel_y_raw;
-  outgoingSensorReading.accel_z_raw  = incoming_accel_z_raw;
-  outgoingSensorReading.gyro_x_raw   = incoming_gyro_x_raw;
-  outgoingSensorReading.gyro_y_raw   = incoming_gyro_y_raw;
-  outgoingSensorReading.gyro_z_raw   = incoming_gyro_z_raw;
+  outgoingSensorReading.accel_x_proc = normAccel.XAxis;
+  outgoingSensorReading.accel_y_proc = normAccel.YAxis;
+  outgoingSensorReading.accel_z_proc = normAccel.ZAxis;
 
-  outgoingSensorReading.accel_x_proc = incoming_accel_x_processed;
-  outgoingSensorReading.accel_y_proc = incoming_accel_y_processed;
-  outgoingSensorReading.accel_z_proc = incoming_accel_z_processed;
-  outgoingSensorReading.gyro_x_proc  = incoming_gyro_x_processed;
-  outgoingSensorReading.gyro_y_proc  = incoming_gyro_y_processed;
-  outgoingSensorReading.gyro_z_proc  = incoming_gyro_z_processed;
+  outgoingSensorReading.gyro_x_raw  = rawGyro.XAxis;
+  outgoingSensorReading.gyro_y_raw  = rawGyro.YAxis;
+  outgoingSensorReading.gyro_z_raw  = rawGyro.ZAxis;
+
+  outgoingSensorReading.gyro_x_proc = normGyro.XAxis;
+  outgoingSensorReading.gyro_y_proc = normGyro.YAxis;
+  outgoingSensorReading.gyro_z_proc = normGyro.ZAxis;
 }
 
 void sendCurrentACCELEROMETERValue() {
@@ -148,13 +141,63 @@ void OnDataReceive(const uint8_t* mac_addr, const uint8_t *incomingData, int len
   printAccelerometerDataNice();
 }
 
+void printAccelSettings() {
+  Serial.println();
+  
+  Serial.print(" * Sleep Mode:            ");
+  Serial.println(ACCEL.getSleepEnabled() ? "Enabled" : "Disabled");
+  
+  Serial.print(" * Clock Source:          ");
+  switch(ACCEL.getClockSource())
+  {
+    case MPU6050_CLOCK_KEEP_RESET:     Serial.println("Stops the clock and keeps the timing generator in reset"); break;
+    case MPU6050_CLOCK_EXTERNAL_19MHZ: Serial.println("PLL with external 19.2MHz reference"); break;
+    case MPU6050_CLOCK_EXTERNAL_32KHZ: Serial.println("PLL with external 32.768kHz reference"); break;
+    case MPU6050_CLOCK_PLL_ZGYRO:      Serial.println("PLL with Z axis gyroscope reference"); break;
+    case MPU6050_CLOCK_PLL_YGYRO:      Serial.println("PLL with Y axis gyroscope reference"); break;
+    case MPU6050_CLOCK_PLL_XGYRO:      Serial.println("PLL with X axis gyroscope reference"); break;
+    case MPU6050_CLOCK_INTERNAL_8MHZ:  Serial.println("Internal 8MHz oscillator"); break;
+  }
+  
+  Serial.print(" * Accelerometer:         ");
+  switch(ACCEL.getRange())
+  {
+    case MPU6050_RANGE_16G:            Serial.println("+/- 16 g"); break;
+    case MPU6050_RANGE_8G:             Serial.println("+/- 8 g"); break;
+    case MPU6050_RANGE_4G:             Serial.println("+/- 4 g"); break;
+    case MPU6050_RANGE_2G:             Serial.println("+/- 2 g"); break;
+  }  
+
+  Serial.print(" * Accelerometer offsets: ");
+  Serial.print(ACCEL.getAccelOffsetX());
+  Serial.print(" / ");
+  Serial.print(ACCEL.getAccelOffsetY());
+  Serial.print(" / ");
+  Serial.println(ACCEL.getAccelOffsetZ());
+  
+  Serial.println();
+}
+
 void setup() {
   // 
   pinMode(START_TRANSMITTING_BUTTON, INPUT_PULLUP);
 
-  Serial.begin(38400);
+  Serial.begin(115200);
   // start I2C communication
-  Wire.begin();
+  //Wire.setPins(21, 22);
+  //Wire.begin();
+  Wire.begin((uint8_t)0x68, 32, 33); // address, SDA, SCL, frequency(not needed)
+  Serial.print("I2C Timeout (ms): ");
+  Serial.println(Wire.getTimeOut(), DEC);
+
+  Serial.println("Initializing Accelerometer...");
+  while(!ACCEL.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G)) {
+    Wire.clearWriteError();
+    Serial.println("Could not find accelerometer. Check wiring?");
+    delay(500);
+  }
+
+  printAccelSettings();
 
   WiFi.mode(WIFI_STA); // station
   Serial.print("Hello, i'm peripheral, my MAC Address is: ");
@@ -180,19 +223,7 @@ void setup() {
 
   esp_now_register_recv_cb(OnDataReceive);
 
-  Serial.println("Initializing Accelerometer...");
-  ACCEL.initialize();
-
-  Serial.println("Testing Accelerometer Connection...");
-  if(!ACCEL.testConnection()) {
-    Serial.println("MPU6050 connection failed");
-    for(;;);
-  }
-  else {
-    Serial.println("MPU6050 connection successful");
-  }
-
-  // TODO: figure out how to set settings on accelerometer
+// TODO: figure out how to set settings on accelerometer
 
   Serial.println("Entering main loop and sleeping...");
   WiFi.setSleep(true);
