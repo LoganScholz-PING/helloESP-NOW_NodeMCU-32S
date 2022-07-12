@@ -632,7 +632,7 @@ uint8_t MPU6050::fastRegister8(uint8_t reg)
 	value = Wire.read();
     #else
 	value = Wire.receive();
-    #endif;
+    #endif
     Wire.endTransmission();
 
     return value;
@@ -658,7 +658,7 @@ uint8_t MPU6050::readRegister8(uint8_t reg)
 	value = Wire.read();
     #else
 	value = Wire.receive();
-    #endif;
+    #endif
     Wire.endTransmission();
 
     return value;
@@ -699,7 +699,7 @@ int16_t MPU6050::readRegister16(uint8_t reg)
     #else
         uint8_t vha = Wire.receive();
         uint8_t vla = Wire.receive();
-    #endif;
+    #endif
     Wire.endTransmission();
 
     value = vha << 8 | vla;

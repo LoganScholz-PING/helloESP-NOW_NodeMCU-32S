@@ -8,7 +8,7 @@
    ** PERIPHERAL READS ACCELEROMETER DATA AND TRANSMITS TO CONTROLLER **
 */
 
-#include <Arduino.h>
+//#include <Arduino.h>
 #include <esp_now.h>
 #include <Wifi.h>
 
