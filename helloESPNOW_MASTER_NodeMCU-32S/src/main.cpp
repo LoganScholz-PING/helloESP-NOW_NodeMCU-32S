@@ -50,7 +50,8 @@ typedef struct struct_accel_message {
   unsigned long total_measurement_time; // total time it took for 1 measurement (milliseconds)
 } struct_accel_message;
 
-struct_accel_message incomingSensorReading; // for controller code
+//struct_accel_message incomingSensorReading; // for controller code... old.. moved to OnDataReceive
+                                              // to hopefully make memory cleanup and garbage collection better
 struct_accel_message outgoingSensorReading; // for peripheral code
 
 esp_now_peer_info_t peerInfo;
@@ -62,7 +63,12 @@ unsigned long count = 0;
 unsigned long total_time_delta = 0;
 
 void printAccelerometerDataNice() {
-  if(millis() - last_message_received_time >= 1000) count = 0;
+  if(millis() - last_message_received_time >= 1000) {
+    count = 0;
+    // i believe there are memory leak problems so let's keep track of the memory usage
+    Serial.print(" --> DEBUG --> Total Free Heap.. "); Serial.print(ESP.getFreeHeap());    Serial.println(" bytes");
+    Serial.print(" --> DEBUG --> Min Free Heap.... "); Serial.print(ESP.getMinFreeHeap()); Serial.println(" bytes");
+  } 
   Serial.print(count++);
   Serial.print(",");
   Serial.print(incoming_accel_x_raw);
@@ -102,6 +108,8 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 // when this microcontroller receives a message, this function is triggered
 void OnDataReceive(const uint8_t* mac_addr, const uint8_t *incomingData, int len) {
+  struct_accel_message incomingSensorReading; // hopefully this memory will be destroyed 
+                                              // now upon exiting this function
   memcpy(&incomingSensorReading, incomingData, sizeof(incomingSensorReading));
 
   // now that the incomingSensorReading memory structure's values are filled  
