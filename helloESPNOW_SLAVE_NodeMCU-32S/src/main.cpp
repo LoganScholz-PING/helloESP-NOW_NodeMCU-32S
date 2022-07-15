@@ -75,7 +75,8 @@ unsigned long end_measurement_time   = 0;
 void readCurrentACCELEROMETERValue() {
   // ask the accelerometer for current readings
   Vector rawAccel  = ACCEL.readRawAccel();
-  Vector normAccel = ACCEL.readNormalizeAccel();
+  //Vector normAccel = ACCEL.readNormalizeAccel();
+  Vector scaledAccel = ACCEL.readScaledAccel();
   Vector rawGyro   = ACCEL.readRawGyro();
   Vector normGyro  = ACCEL.readNormalizeGyro();
 
@@ -86,9 +87,14 @@ void readCurrentACCELEROMETERValue() {
   outgoingSensorReading.accel_y_raw  = rawAccel.YAxis;
   outgoingSensorReading.accel_z_raw  = rawAccel.ZAxis;
 
-  outgoingSensorReading.accel_x_proc = normAccel.XAxis;
-  outgoingSensorReading.accel_y_proc = normAccel.YAxis;
-  outgoingSensorReading.accel_z_proc = normAccel.ZAxis;
+  //outgoingSensorReading.accel_x_proc = normAccel.XAxis;
+  //outgoingSensorReading.accel_y_proc = normAccel.YAxis;
+  //outgoingSensorReading.accel_z_proc = normAccel.ZAxis;
+
+  outgoingSensorReading.accel_x_proc = scaledAccel.XAxis;
+  outgoingSensorReading.accel_y_proc = scaledAccel.YAxis;
+  outgoingSensorReading.accel_z_proc = scaledAccel.ZAxis;
+
 
   outgoingSensorReading.gyro_x_raw  = rawGyro.XAxis;
   outgoingSensorReading.gyro_y_raw  = rawGyro.YAxis;

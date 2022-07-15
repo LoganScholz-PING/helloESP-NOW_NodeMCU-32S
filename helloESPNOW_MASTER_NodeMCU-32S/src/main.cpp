@@ -66,8 +66,8 @@ void printAccelerometerDataNice() {
   if(millis() - last_message_received_time >= 1000) {
     count = 0;
     // i believe there are memory leak problems so let's keep track of the memory usage
-    Serial.print(" --> DEBUG --> Total Free Heap.. "); Serial.print(ESP.getFreeHeap());    Serial.println(" bytes");
-    Serial.print(" --> DEBUG --> Min Free Heap.... "); Serial.print(ESP.getMinFreeHeap()); Serial.println(" bytes");
+    //Serial.print(" --> DEBUG --> Total Free Heap.. "); Serial.print(ESP.getFreeHeap());    Serial.println(" bytes");
+    //Serial.print(" --> DEBUG --> Min Free Heap.... "); Serial.print(ESP.getMinFreeHeap()); Serial.println(" bytes");
   } 
   Serial.print(count++);
   Serial.print(",");
