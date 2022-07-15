@@ -24,8 +24,8 @@
 
 MPU6050 ACCEL; // hardcode I2C address = 0x68 or 0x69
 
-uint8_t controllerBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC }; // good one
-//uint8_t controllerBroadcastAddress[] = { 0x30, 0xC6, 0xF7, 0x29, 0xBE, 0x68 }; // test unit
+//uint8_t controllerBroadcastAddress[] = { 0x24, 0x0A, 0xC4, 0xEC, 0x07, 0xCC }; // good one
+uint8_t controllerBroadcastAddress[] = { 0x30, 0xC6, 0xF7, 0x29, 0xBE, 0x68 }; // test unit
 uint8_t peripheralBroadcastAddresss[] = { 0x24, 0x0A, 0xC4, 0xEC, 0xA6, 0xF0 };
 
 // these variables are for holding any received data
@@ -191,7 +191,7 @@ void setup() {
   Serial.println(Wire.getTimeOut(), DEC);
 
   Serial.println("Initializing Accelerometer...");
-  while(!ACCEL.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_2G)) {
+  while(!ACCEL.begin(MPU6050_SCALE_2000DPS, MPU6050_RANGE_16G)) {
     Wire.clearWriteError();
     Serial.println("Could not find accelerometer. Check wiring?");
     delay(500);
